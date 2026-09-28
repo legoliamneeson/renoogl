@@ -1,0 +1,154 @@
+{
+  "status": "experimental source; Windows builds not run",
+  "renodx_base": "9b212edad4dde9bca2b823b1e045b712b1a8d854",
+  "reshade_base": "4a50d1eddace85734871d91792ff214f13f66c01",
+  "passed": [
+    "GLSL/SPIR-V byte format tests",
+    "Mesa OpenGL 4.5 state and pixel-readback integration tests with exact ReShade GLAD extension list",
+    "Mock process heap allocator: simulated 8/16-byte native alignment",
+    "git diff --check (both repositories)"
+  ],
+  "not_run": [
+    "Windows x86/x64 builds",
+    "Native SPIR-V capture on Windows",
+    "Game and HDR validation"
+  ],
+  "files": [
+    {
+      "path": "README_OPENGL.md",
+      "sha256": "9a8ebee9a39ecf9e0ca56d9cdc6e1ec1da96ca1a964170ac299e1a3a5f9d1454"
+    },
+    {
+      "path": "external/reshade/deps/CMakeLists.txt",
+      "sha256": "ce6a5eaeef1c4b0b35cdceb42eb587d9fe5c274854c2ebaebdeaca97b1f99d92"
+    },
+    {
+      "path": "external/reshade/deps/glad.vcxproj",
+      "sha256": "b3974b8f4a33b004cacab54d9c111a69a2c89d3070dd1cf6893f520852e1cd3d"
+    },
+    {
+      "path": "external/reshade/source/opengl/opengl.cpp",
+      "sha256": "5bf7caab2f18848e1ef56928499a2e6928579d21e1010ac5baf8080d0c0ff817"
+    },
+    {
+      "path": "external/reshade/source/opengl/opengl_hooks.hpp",
+      "sha256": "ba5c0ec6c70189451d606a32b24c6d84a75387ea5b9e5b9d6d4c821447741653"
+    },
+    {
+      "path": "external/reshade/source/opengl/opengl_hooks_wgl.cpp",
+      "sha256": "92e9d631de8391b6932240feb0f59975788183cd168063466b98447f023273a2"
+    },
+    {
+      "path": "external/reshade/source/opengl/opengl_impl_command_list.cpp",
+      "sha256": "14ff2f71c805df16e0ee78e692c6c802f4bd64dd48d16bbf001943871435db2f"
+    },
+    {
+      "path": "external/reshade/source/opengl/opengl_impl_device.cpp",
+      "sha256": "f6695f0c368220d77a44a3a9bd88ef74312370d7c44867616fa870cc2a9db24e"
+    },
+    {
+      "path": "external/reshade/source/opengl/opengl_impl_device.hpp",
+      "sha256": "0dde594b3536493f1c7b0e5e7996013f1fcb31c4ca23ebb32452cd9e73c99af8"
+    },
+    {
+      "path": "external/reshade/source/opengl/opengl_impl_device_context.hpp",
+      "sha256": "72323cc3d3387059225e7708783ad56113f23f923c7ce2ff2758463df4d4285a"
+    },
+    {
+      "path": "external/reshade/source/opengl/opengl_impl_type_convert.hpp",
+      "sha256": "906530f516b416f1d0cd82f97f34d70c7fbb6f5f3c4d7acbb0b1ed9aa942bb51"
+    },
+    {
+      "path": "external/reshade/source/opengl/opengl_program_state.hpp",
+      "sha256": "b7891b0284665557f01f7b0eacbefab27134e064e0965db865fd75d8677442c0"
+    },
+    {
+      "path": "patches/reshade-opengl.patch",
+      "sha256": "02094b095ae0f60802b39ac49afea99d871403d055ed4f81006f622e8c67f40e"
+    },
+    {
+      "path": "scripts/build-opengl.ps1",
+      "sha256": "9bd85e1c9935949022a56242650b1a6901f9dc0fe629b8466f0eb9afa96ea7c6"
+    },
+    {
+      "path": "src/addons/devkit/addon.cpp",
+      "sha256": "e37b1fb3aa51b3b68ee3c62f1686a1dde77a975b35ea1952327415612ee26a37"
+    },
+    {
+      "path": "src/addons/devkit_opengl/README.md",
+      "sha256": "0c2ffdc4d82ef417a43ccab19042c9a81cd43ee21bfa052322022fc667f7552f"
+    },
+    {
+      "path": "src/addons/devkit_opengl/addon.cpp",
+      "sha256": "37b8d866c02f931ff03c6f408f84e7c18ff0fcc7a6cbbf1d7ffdc1be8d25708b"
+    },
+    {
+      "path": "src/addons/devkit_opengl/examples/injection_layout.glsl.txt",
+      "sha256": "0eed34c6c5d10d539a47925d6bf6ddcb0bc3d2d6f98908189f523c029e994e9d"
+    },
+    {
+      "path": "src/addons/devkit_opengl/examples/injection_layout.hpp",
+      "sha256": "9bc94640d0dc051f9fdcfebda0c508ab668e45d2ba0bf482da070efcfe4da131"
+    },
+    {
+      "path": "src/addons/devkit_opengl/metadata.json",
+      "sha256": "3a4663d78b6f8a01663e779bef168ac8f58a38027e1a315255d21bc1f0ed799f"
+    },
+    {
+      "path": "src/addons/devkit_opengl/swap_chain_proxy_pixel_shader.ps_5_x.hlsl",
+      "sha256": "5eb442d462eafc982efab1df5129d9a7718641a2b38fceef919b210ce9808fb8"
+    },
+    {
+      "path": "src/addons/devkit_opengl/swap_chain_proxy_vertex_shader.vs_5_x.hlsl",
+      "sha256": "0bfe7aec1b7c4af533297c71625ee7e3f02fd2b9b9946c8b943b9015408d04c6"
+    },
+    {
+      "path": "src/mods/shader.hpp",
+      "sha256": "6320243eb74ff23d2bda0089e0a0c774936f0e7a35473dea571a7b2c98c30f72"
+    },
+    {
+      "path": "src/utils/constants.hpp",
+      "sha256": "367a971f95ad71e286f27c8584bc827a3a09436ec449302dd2e66835b6a688fc"
+    },
+    {
+      "path": "src/utils/pipeline.hpp",
+      "sha256": "70c054beb1034a2158a6401c4877abb1d9022636915b883c04bb7ab5bbcc3f8a"
+    },
+    {
+      "path": "src/utils/platform.hpp",
+      "sha256": "17f05a8555cf8fedafa71473eee0ee27f9a5859572dd9290ff1789546cac0b68"
+    },
+    {
+      "path": "src/utils/shader.hpp",
+      "sha256": "cb65b4c38373cd662659c8b1adf8f36443de6c6d9b0e58f0bf547e25482555ee"
+    },
+    {
+      "path": "src/utils/shader_compiler_vulkan.hpp",
+      "sha256": "9c97bc5631691f46310625008ba8c20fedae7e3c246c2348e7e1f1a4473eb7a0"
+    },
+    {
+      "path": "src/utils/shader_compiler_watcher.hpp",
+      "sha256": "5526f2be335a10a48ca4ea1e146b1a49c36cbde08c6556c940dde1cb4597dca9"
+    },
+    {
+      "path": "src/utils/shader_dump.hpp",
+      "sha256": "32597292cb7411be786cbbecb77048c3771427b6e438529fed1ab0853d28fdf3"
+    },
+    {
+      "path": "src/utils/shader_format.hpp",
+      "sha256": "2439586056151e9ab2bbac4992fafb311e9e5ff0ea669577e17a4de0dd76f950"
+    },
+    {
+      "path": "test/opengl_program_state/tests.cpp",
+      "sha256": "28a9d864263b743b6b12f9fdc3fa160e3bd7c8ac1f6c72b58a5b5f9a53a1aadf"
+    },
+    {
+      "path": "test/opengl_shader_format/tests.cpp",
+      "sha256": "386b1313a50e933481094e26d7d9f61201a5a087b663c8dfe4aad649557825af"
+    },
+    {
+      "path": "test/process_heap_alignment/run.py",
+      "sha256": "7f94fd90fcc7661ddf5e311f9e9a07ab40dcce0004ae355d674763584f01d192"
+    }
+  ]
+}

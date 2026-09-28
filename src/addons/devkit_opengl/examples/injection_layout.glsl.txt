@@ -1,0 +1,12 @@
+// Insert after the replacement shader's #version / #extension directives.
+// Requires GLSL 420 or GL_ARB_shading_language_420pack for binding syntax.
+// Binding 13 must be available in the game; select the same index in the addon.
+layout(std140, binding = 13) uniform RenoDXInjection {
+    float peak_nits;
+    float game_nits;
+    float ui_nits;
+    float exposure;
+} renodx;
+// Same declaration for GLSL source and GLSL compiled to OpenGL SPIR-V.
+// Mirror the FULL actual C++ structure when integrating an existing game.
+// Do not replace adjacent floats with arrays: std140 arrays have 16-byte stride.

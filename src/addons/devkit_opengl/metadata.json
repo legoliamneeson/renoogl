@@ -1,0 +1,6 @@
+{
+  "id": "devkit_opengl",
+  "title": "RenoDX OpenGL DevKit",
+  "status": "experimental",
+  "deploy": {"api": "opengl", "architecture": ["x86", "x64"]}
+}

@@ -1,0 +1,30 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "(msvc) Attach",
+      "type": "cppvsdbg",
+      "request": "attach",
+      "processId": "${command:pickProcess}"
+    },
+    {
+      "name": "Deploy Early Access",
+      "type": "PowerShell",
+      "request": "launch",
+      "script": "${workspaceFolder}/scripts/deploy-early-access.ps1",
+      "cwd": "${cwd}",
+      "args": [
+        "--target", "${command:cmake.buildTargetName}",
+        "--description", "\"${input:deployDescription}\""
+      ],
+    },
+  ],
+  "inputs": [
+    {
+      "id": "deployDescription",
+      "type": "promptString",
+      "description": "Deploy description (optional)",
+      "default": ""
+    }
+  ]
+}

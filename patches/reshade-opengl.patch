@@ -1,0 +1,1176 @@
+diff --git a/deps/CMakeLists.txt b/deps/CMakeLists.txt
+index 92cdad6..273d969 100644
+--- a/deps/CMakeLists.txt
++++ b/deps/CMakeLists.txt
+@@ -68,7 +68,7 @@ set(GLAD_APIS
+   vulkan=1.4
+ )
+ set(GLAD_EXTENSIONS
+-  GL_ARB_texture_compression_bptc;GL_EXT_texture;GL_EXT_texture_compression_s3tc;GL_EXT_texture_storage;GL_EXT_memory_object;GL_EXT_memory_object_win32;GL_EXT_semaphore;GL_EXT_semaphore_win32
++  GL_ARB_gl_spirv;GL_ARB_texture_compression_bptc;GL_EXT_texture;GL_EXT_texture_compression_s3tc;GL_EXT_texture_storage;GL_EXT_memory_object;GL_EXT_memory_object_win32;GL_EXT_semaphore;GL_EXT_semaphore_win32
+   VK_EXT_conservative_rasterization;VK_EXT_custom_border_color;VK_EXT_debug_utils;VK_EXT_extended_dynamic_state;VK_EXT_extended_dynamic_state2;VK_EXT_extended_dynamic_state3;VK_EXT_full_screen_exclusive;VK_EXT_graphics_pipeline_library;VK_EXT_host_image_copy;VK_EXT_host_query_reset;VK_EXT_index_type_uint8;VK_EXT_load_store_op_none;VK_EXT_mesh_shader;VK_EXT_multi_draw;VK_EXT_private_data;VK_EXT_swapchain_colorspace;VK_EXT_tooling_info;VK_EXT_transform_feedback;VK_KHR_acceleration_structure;VK_KHR_bind_memory2;VK_KHR_buffer_device_address;VK_KHR_copy_commands2;VK_KHR_create_renderpass2;VK_KHR_dedicated_allocation;VK_KHR_depth_stencil_resolve;VK_KHR_descriptor_update_template;VK_KHR_device_group;VK_KHR_display_swapchain;VK_KHR_draw_indirect_count;VK_KHR_dynamic_rendering;VK_KHR_external_memory_capabilities;VK_KHR_external_memory_win32;VK_KHR_external_semaphore_win32;VK_KHR_format_feature_flags2;VK_KHR_get_memory_requirements2;VK_KHR_get_physical_device_properties2;VK_KHR_image_format_list;VK_KHR_incremental_present;VK_KHR_maintenance4;VK_KHR_maintenance5;VK_KHR_maintenance9;VK_KHR_pipeline_library;VK_KHR_push_descriptor;VK_KHR_ray_tracing_maintenance1;VK_KHR_ray_tracing_pipeline;VK_KHR_surface;VK_KHR_swapchain;VK_KHR_swapchain_mutable_format;VK_KHR_synchronization2;VK_KHR_timeline_semaphore;VK_KHR_win32_surface
+ )
+ set(GLAD_GENERATED_FILES
+diff --git a/deps/glad.vcxproj b/deps/glad.vcxproj
+index 5348229..05d6779 100644
+--- a/deps/glad.vcxproj
++++ b/deps/glad.vcxproj
+@@ -39,7 +39,7 @@
+   </ItemGroup>
+   <PropertyGroup>
+     <GladGLVersion>gl:compatibility=4.6</GladGLVersion>
+-    <GladGLExtensions>GL_ARB_texture_compression_bptc;GL_EXT_texture;GL_EXT_texture_compression_s3tc;GL_EXT_texture_storage;GL_EXT_memory_object;GL_EXT_memory_object_win32;GL_EXT_semaphore;GL_EXT_semaphore_win32</GladGLExtensions>
++    <GladGLExtensions>GL_ARB_gl_spirv;GL_ARB_texture_compression_bptc;GL_EXT_texture;GL_EXT_texture_compression_s3tc;GL_EXT_texture_storage;GL_EXT_memory_object;GL_EXT_memory_object_win32;GL_EXT_semaphore;GL_EXT_semaphore_win32</GladGLExtensions>
+     <GladWGLVersion>wgl=1.0</GladWGLVersion>
+     <GladWGLExtensions>WGL_ARB_create_context;WGL_ARB_create_context_profile;WGL_ARB_framebuffer_sRGB;WGL_ARB_multisample;WGL_ARB_pbuffer;WGL_ARB_pixel_format;WGL_ARB_render_texture</GladWGLExtensions>
+     <GladVulkanVersion>vulkan=1.4</GladVulkanVersion>
+diff --git a/source/opengl/opengl.cpp b/source/opengl/opengl.cpp
+index a99f0e9..0aa555d 100644
+--- a/source/opengl/opengl.cpp
++++ b/source/opengl/opengl.cpp
+@@ -9,6 +9,7 @@
+ #include "opengl_hooks.hpp"
+ #include "hook_manager.hpp"
+ #include "addon_manager.hpp"
++#include <optional>
+ #include <cstring> // std::memset, std::strlen
+ 
+ #define gl static_cast<reshade::opengl::device_impl *>(g_opengl_context->get_device())->_dispatch_table
+@@ -790,7 +791,7 @@ extern "C" void APIENTRY glCopyPixels(GLint x, GLint y, GLsizei width, GLsizei h
+ extern "C" void APIENTRY glClear(GLbitfield mask)
+ {
+ #if RESHADE_ADDON
+-	if (g_opengl_context && (
++	if (g_opengl_context && count > 0 && string && (
+ 		reshade::has_addon_event<reshade::addon_event::clear_depth_stencil_view>() ||
+ 		reshade::has_addon_event<reshade::addon_event::clear_render_target_view>()))
+ 	{
+@@ -1354,6 +1355,8 @@ extern "C" void APIENTRY glDrawArrays(GLenum mode, GLint first, GLsizei count)
+ #endif
+ 
+ 	static const auto trampoline = reshade::hooks::call(glDrawArrays);
++	std::optional<reshade::opengl::program_replacement_scope> replacement_scope;
++	if (g_opengl_context) replacement_scope.emplace(gl, g_opengl_context->_program_replacement);
+ 	trampoline(mode, first, count);
+ }
+ extern "C" void APIENTRY glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid *indices)
+@@ -1373,6 +1376,8 @@ extern "C" void APIENTRY glDrawElements(GLenum mode, GLsizei count, GLenum type,
+ #endif
+ 
+ 	static const auto trampoline = reshade::hooks::call(glDrawElements);
++	std::optional<reshade::opengl::program_replacement_scope> replacement_scope;
++	if (g_opengl_context) replacement_scope.emplace(gl, g_opengl_context->_program_replacement);
+ 	trampoline(mode, count, type, indices);
+ }
+ #endif
+@@ -1439,6 +1444,8 @@ void APIENTRY glDrawRangeElements(GLenum mode, GLuint start, GLuint end, GLsizei
+ #endif
+ 
+ 	static const auto trampoline = reshade::hooks::call(glDrawRangeElements);
++	std::optional<reshade::opengl::program_replacement_scope> replacement_scope;
++	if (g_opengl_context) replacement_scope.emplace(gl, g_opengl_context->_program_replacement);
+ 	trampoline(mode, start, end, count, type, indices);
+ }
+ #endif
+@@ -1623,6 +1630,8 @@ void APIENTRY glMultiDrawArrays(GLenum mode, const GLint *first, const GLsizei *
+ #endif
+ 
+ 	static const auto trampoline = reshade::hooks::call(glMultiDrawArrays);
++	std::optional<reshade::opengl::program_replacement_scope> replacement_scope;
++	if (g_opengl_context) replacement_scope.emplace(gl, g_opengl_context->_program_replacement);
+ 	trampoline(mode, first, count, drawcount);
+ }
+ void APIENTRY glMultiDrawElements(GLenum mode, const GLsizei *count, GLenum type, const GLvoid *const *indices, GLsizei drawcount)
+@@ -1646,6 +1655,8 @@ void APIENTRY glMultiDrawElements(GLenum mode, const GLsizei *count, GLenum type
+ #endif
+ 
+ 	static const auto trampoline = reshade::hooks::call(glMultiDrawElements);
++	std::optional<reshade::opengl::program_replacement_scope> replacement_scope;
++	if (g_opengl_context) replacement_scope.emplace(gl, g_opengl_context->_program_replacement);
+ 	trampoline(mode, count, type, indices, drawcount);
+ }
+ #endif
+@@ -1771,11 +1782,12 @@ void APIENTRY glDeleteProgram(GLuint program)
+ 	{
+ 		const auto device = static_cast<reshade::opengl::device_impl *>(g_opengl_context->get_device());
+ 
+-		GLint status = GL_FALSE;
+-		gl.GetProgramiv(program, GL_LINK_STATUS, &status);
+-
+-		// Only invoke 'destroy_pipeline' event for programs that had a corresponding 'init_pipeline' event invoked in 'glLinkProgram'
+-		if (GL_FALSE != status)
++		bool notified;
++		{
++			std::lock_guard lock(device->shader_capture_mutex);
++			notified = device->notified_programs.erase(program) != 0;
++		}
++		if (notified)
+ 		{
+ 			reshade::invoke_addon_event<reshade::addon_event::destroy_pipeline>(device, reshade::api::pipeline { (static_cast<uint64_t>(GL_PROGRAM) << 40) | program });
+ 		}
+@@ -1788,6 +1800,19 @@ void APIENTRY glDeleteProgram(GLuint program)
+ 
+ void APIENTRY glLinkProgram(GLuint program)
+ {
++#if RESHADE_ADDON
++	if (g_opengl_context && program != 0)
++	{
++		const auto device = static_cast<reshade::opengl::device_impl *>(g_opengl_context->get_device());
++		bool notified;
++		{
++			std::lock_guard lock(device->shader_capture_mutex);
++			notified = device->notified_programs.erase(program) != 0;
++		}
++		if (notified)
++			reshade::invoke_addon_event<reshade::addon_event::destroy_pipeline>(device, reshade::api::pipeline { (static_cast<uint64_t>(GL_PROGRAM) << 40) | program });
++	}
++#endif
+ 	static const auto trampoline = reshade::hooks::call(glLinkProgram);
+ 	trampoline(program);
+ 
+@@ -1803,13 +1828,15 @@ void APIENTRY glLinkProgram(GLuint program)
+ 
+ 		if (GL_FALSE != status)
+ 		{
+-			std::vector<std::pair<reshade::api::shader_desc, std::vector<char>>> sources;
+-			sources.reserve(16);
++			struct captured_shader { reshade::api::shader_desc desc; reshade::opengl::device_impl::shader_binary_data data; };
++			GLint attached_count = 0;
++			gl.GetProgramiv(program, GL_ATTACHED_SHADERS, &attached_count);
++			std::vector<captured_shader> sources;
++			sources.reserve(attached_count);
+ 			std::vector<reshade::api::pipeline_subobject> subobjects;
+-			subobjects.reserve(16);
+-
+-			GLuint shaders[16] = {};
+-			gl.GetAttachedShaders(program, 16, nullptr, shaders);
++			subobjects.reserve(attached_count);
++			std::vector<GLuint> shaders(attached_count);
++			gl.GetAttachedShaders(program, attached_count, nullptr, shaders.data());
+ 
+ 			for (const GLuint shader : shaders)
+ 			{
+@@ -1845,31 +1872,145 @@ void APIENTRY glLinkProgram(GLuint program)
+ 					continue;
+ 				}
+ 
+-				GLint size = 0;
+-				gl.GetShaderiv(shader, GL_SHADER_SOURCE_LENGTH, &size);
+-
+-				std::pair<reshade::api::shader_desc, std::vector<char>> &source = sources.emplace_back();
+-				source.second.resize(size);
+-
+-				gl.GetShaderSource(shader, size, nullptr, source.second.data());
+-
+-				reshade::api::shader_desc &desc = source.first;
+-				desc.code = source.second.data();
+-				desc.code_size = size;
+-				desc.entry_point = "main";
++				auto &source = sources.emplace_back();
++				{
++					std::lock_guard lock(device->shader_capture_mutex);
++					const auto it = device->shader_binaries.find(shader);
++					if (it != device->shader_binaries.end()) source.data = it->second;
++				}
++				if (source.data.code.empty())
++				{
++					GLint size = 0;
++					gl.GetShaderiv(shader, GL_SHADER_SOURCE_LENGTH, &size);
++					if (size <= 1) { sources.pop_back(); continue; }
++					source.data.code.resize(size);
++					gl.GetShaderSource(shader, size, nullptr, source.data.code.data());
++				}
++				auto &desc = source.desc;
++				desc.code = source.data.code.data();
++				desc.code_size = source.data.code.size();
++				desc.entry_point = source.data.entry_point.c_str();
++				desc.spec_constants = static_cast<uint32_t>(source.data.ids.size());
++				desc.spec_constant_ids = source.data.ids.data();
++				desc.spec_constant_values = source.data.values.data();
+ 
+ 				subobjects.push_back({ subobject_type, 1, &desc });
+ 			}
+ 
++			{
++				std::lock_guard lock(device->shader_capture_mutex);
++				device->notified_programs.insert(program);
++			}
+ 			reshade::invoke_addon_event<reshade::addon_event::init_pipeline>(device, get_opengl_pipeline_layout(), static_cast<uint32_t>(subobjects.size()), subobjects.data(), reshade::api::pipeline { (static_cast<uint64_t>(GL_PROGRAM) << 40) | program });
+ 		}
+ 	}
+ #endif
+ }
+ 
++GLuint APIENTRY glCreateShader(GLenum type)
++{
++	static const auto trampoline = reshade::hooks::call(glCreateShader);
++	const GLuint shader = trampoline(type);
++#if RESHADE_ADDON
++	if (g_opengl_context && shader != 0)
++	{
++		const auto device = static_cast<reshade::opengl::device_impl *>(g_opengl_context->get_device());
++		std::lock_guard lock(device->shader_capture_mutex);
++		device->shader_binaries.erase(shader);
++	}
++#endif
++	return shader;
++}
++void APIENTRY glDeleteShader(GLuint shader)
++{
++	static const auto trampoline = reshade::hooks::call(glDeleteShader);
++	trampoline(shader);
++#if RESHADE_ADDON
++	if (g_opengl_context && !gl.IsShader(shader))
++	{
++		const auto device = static_cast<reshade::opengl::device_impl *>(g_opengl_context->get_device());
++		std::lock_guard lock(device->shader_capture_mutex);
++		device->shader_binaries.erase(shader);
++	}
++#endif
++}
++void APIENTRY glDetachShader(GLuint program, GLuint shader)
++{
++	static const auto trampoline = reshade::hooks::call(glDetachShader);
++	trampoline(program, shader);
++#if RESHADE_ADDON
++	if (g_opengl_context && !gl.IsShader(shader))
++	{
++		const auto device = static_cast<reshade::opengl::device_impl *>(g_opengl_context->get_device());
++		std::lock_guard lock(device->shader_capture_mutex);
++		device->shader_binaries.erase(shader);
++	}
++#endif
++}
++void APIENTRY glShaderBinary(GLsizei count, const GLuint *shaders, GLenum format, const void *binary, GLsizei length)
++{
++	static const auto trampoline = reshade::hooks::call(glShaderBinary);
++	trampoline(count, shaders, format, binary, length);
++#if RESHADE_ADDON
++	if (g_opengl_context && count > 0 && shaders && binary && length >= 20 && length % 4 == 0 && format == GL_SHADER_BINARY_FORMAT_SPIR_V)
++	{
++		const auto device = static_cast<reshade::opengl::device_impl *>(g_opengl_context->get_device());
++		std::lock_guard lock(device->shader_capture_mutex);
++		for (GLsizei i = 0; i < count; ++i)
++		{
++			if (!gl.IsShader(shaders[i])) continue;
++			GLint is_spirv = GL_FALSE;
++			gl.GetShaderiv(shaders[i], GL_SPIR_V_BINARY, &is_spirv);
++			if (!is_spirv) continue;
++			auto &data = device->shader_binaries[shaders[i]];
++			data = {};
++			data.code.assign(static_cast<const char *>(binary), static_cast<const char *>(binary) + length);
++		}
++	}
++#endif
++}
++static void capture_shader_specialization(GLuint shader, const GLchar *entry, GLuint count, const GLuint *ids, const GLuint *values)
++{
++#if RESHADE_ADDON
++	if (g_opengl_context && entry && (count == 0 || (ids && values)))
++	{
++		GLint compiled = GL_FALSE;
++		gl.GetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
++		if (!compiled) return;
++		const auto device = static_cast<reshade::opengl::device_impl *>(g_opengl_context->get_device());
++		std::lock_guard lock(device->shader_capture_mutex);
++		const auto it = device->shader_binaries.find(shader);
++		if (it != device->shader_binaries.end())
++		{
++			it->second.entry_point = entry;
++			it->second.ids.clear(); it->second.values.clear();
++			if (count) { it->second.ids.assign(ids, ids + count); it->second.values.assign(values, values + count); }
++		}
++	}
++#endif
++}
++void APIENTRY glSpecializeShader(GLuint shader, const GLchar *entry, GLuint count, const GLuint *ids, const GLuint *values)
++{
++	static const auto trampoline = reshade::hooks::call(glSpecializeShader);
++	trampoline(shader, entry, count, ids, values);
++	capture_shader_specialization(shader, entry, count, ids, values);
++}
++void APIENTRY glSpecializeShaderARB(GLuint shader, const GLchar *entry, GLuint count, const GLuint *ids, const GLuint *values)
++{
++	static const auto trampoline = reshade::hooks::call(glSpecializeShaderARB);
++	trampoline(shader, entry, count, ids, values);
++	capture_shader_specialization(shader, entry, count, ids, values);
++}
++
+ void APIENTRY glShaderSource(GLuint shader, GLsizei count, const GLchar *const *string, const GLint *length)
+ {
+ #if RESHADE_ADDON
++	if (g_opengl_context && count >= 0 && string)
++	{
++		const auto device = static_cast<reshade::opengl::device_impl *>(g_opengl_context->get_device());
++		std::lock_guard lock(device->shader_capture_mutex);
++		device->shader_binaries.erase(shader);
++	}
+ 	std::string combined_source;
+ 	const GLchar *combined_source_ptr = nullptr;
+ 	GLint combined_source_length = -1;
+@@ -1883,12 +2024,12 @@ void APIENTRY glShaderSource(GLuint shader, GLsizei count, const GLchar *const *
+ 		if (count == 1)
+ 		{
+ 			combined_source_ptr = *string;
+-			combined_source_length = (length != nullptr) ? *length : static_cast<GLint>(std::strlen(combined_source_ptr));
++			combined_source_length = (length != nullptr && *length >= 0) ? *length : static_cast<GLint>(std::strlen(combined_source_ptr));
+ 		}
+ 		else if (length != nullptr)
+ 		{
+ 			for (GLsizei i = 0; i < count; ++i)
+-				combined_source.append(string[i], length[i]);
++				combined_source.append(string[i], length[i] >= 0 ? static_cast<size_t>(length[i]) : std::strlen(string[i]));
+ 
+ 			combined_source_ptr = combined_source.data();
+ 			combined_source_length = static_cast<GLint>(combined_source.size());
+@@ -1958,6 +2099,7 @@ void APIENTRY glShaderSource(GLuint shader, GLsizei count, const GLchar *const *
+ 
+ void APIENTRY glUseProgram(GLuint program)
+ {
++	if (g_opengl_context) g_opengl_context->_program_replacement.reset();
+ 	static const auto trampoline = reshade::hooks::call(glUseProgram);
+ 	trampoline(program);
+ 
+@@ -3099,6 +3241,8 @@ void APIENTRY glDrawArraysInstanced(GLenum mode, GLint first, GLsizei count, GLs
+ #endif
+ 
+ 	static const auto trampoline = reshade::hooks::call(glDrawArraysInstanced);
++	std::optional<reshade::opengl::program_replacement_scope> replacement_scope;
++	if (g_opengl_context) replacement_scope.emplace(gl, g_opengl_context->_program_replacement);
+ 	trampoline(mode, first, count, primcount);
+ }
+ void APIENTRY glDrawElementsInstanced(GLenum mode, GLsizei count, GLenum type, const GLvoid *indices, GLsizei primcount)
+@@ -3118,6 +3262,8 @@ void APIENTRY glDrawElementsInstanced(GLenum mode, GLsizei count, GLenum type, c
+ #endif
+ 
+ 	static const auto trampoline = reshade::hooks::call(glDrawElementsInstanced);
++	std::optional<reshade::opengl::program_replacement_scope> replacement_scope;
++	if (g_opengl_context) replacement_scope.emplace(gl, g_opengl_context->_program_replacement);
+ 	trampoline(mode, count, type, indices, primcount);
+ }
+ #endif
+@@ -3194,6 +3340,8 @@ void APIENTRY glDrawElementsBaseVertex(GLenum mode, GLsizei count, GLenum type,
+ #endif
+ 
+ 	static const auto trampoline = reshade::hooks::call(glDrawElementsBaseVertex);
++	std::optional<reshade::opengl::program_replacement_scope> replacement_scope;
++	if (g_opengl_context) replacement_scope.emplace(gl, g_opengl_context->_program_replacement);
+ 	trampoline(mode, count, type, indices, basevertex);
+ }
+ void APIENTRY glDrawRangeElementsBaseVertex(GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const GLvoid *indices, GLint basevertex)
+@@ -3213,6 +3361,8 @@ void APIENTRY glDrawRangeElementsBaseVertex(GLenum mode, GLuint start, GLuint en
+ #endif
+ 
+ 	static const auto trampoline = reshade::hooks::call(glDrawRangeElementsBaseVertex);
++	std::optional<reshade::opengl::program_replacement_scope> replacement_scope;
++	if (g_opengl_context) replacement_scope.emplace(gl, g_opengl_context->_program_replacement);
+ 	trampoline(mode, start, end, count, type, indices, basevertex);
+ }
+ void APIENTRY glDrawElementsInstancedBaseVertex(GLenum mode, GLsizei count, GLenum type, const GLvoid *indices, GLsizei primcount, GLint basevertex)
+@@ -3232,6 +3382,8 @@ void APIENTRY glDrawElementsInstancedBaseVertex(GLenum mode, GLsizei count, GLen
+ #endif
+ 
+ 	static const auto trampoline = reshade::hooks::call(glDrawElementsInstancedBaseVertex);
++	std::optional<reshade::opengl::program_replacement_scope> replacement_scope;
++	if (g_opengl_context) replacement_scope.emplace(gl, g_opengl_context->_program_replacement);
+ 	trampoline(mode, count, type, indices, primcount, basevertex);
+ }
+ void APIENTRY glMultiDrawElementsBaseVertex(GLenum mode, const GLsizei *count, GLenum type, const GLvoid *const *indices, GLsizei drawcount, const GLint *basevertex)
+@@ -3255,6 +3407,8 @@ void APIENTRY glMultiDrawElementsBaseVertex(GLenum mode, const GLsizei *count, G
+ #endif
+ 
+ 	static const auto trampoline = reshade::hooks::call(glMultiDrawElementsBaseVertex);
++	std::optional<reshade::opengl::program_replacement_scope> replacement_scope;
++	if (g_opengl_context) replacement_scope.emplace(gl, g_opengl_context->_program_replacement);
+ 	trampoline(mode, count, type, indices, drawcount, basevertex);
+ }
+ #endif
+@@ -3307,6 +3461,8 @@ void APIENTRY glDrawArraysIndirect(GLenum mode, const GLvoid *indirect)
+ #endif
+ 
+ 	static const auto trampoline = reshade::hooks::call(glDrawArraysIndirect);
++	std::optional<reshade::opengl::program_replacement_scope> replacement_scope;
++	if (g_opengl_context) replacement_scope.emplace(gl, g_opengl_context->_program_replacement);
+ 	trampoline(mode, indirect);
+ }
+ void APIENTRY glDrawElementsIndirect(GLenum mode, GLenum type, const GLvoid *indirect)
+@@ -3347,6 +3503,8 @@ void APIENTRY glDrawElementsIndirect(GLenum mode, GLenum type, const GLvoid *ind
+ #endif
+ 
+ 	static const auto trampoline = reshade::hooks::call(glDrawElementsIndirect);
++	std::optional<reshade::opengl::program_replacement_scope> replacement_scope;
++	if (g_opengl_context) replacement_scope.emplace(gl, g_opengl_context->_program_replacement);
+ 	trampoline(mode, type, indirect);
+ }
+ #endif
+@@ -3609,6 +3767,8 @@ void APIENTRY glDrawArraysInstancedBaseInstance(GLenum mode, GLint first, GLsize
+ #endif
+ 
+ 	static const auto trampoline = reshade::hooks::call(glDrawArraysInstancedBaseInstance);
++	std::optional<reshade::opengl::program_replacement_scope> replacement_scope;
++	if (g_opengl_context) replacement_scope.emplace(gl, g_opengl_context->_program_replacement);
+ 	trampoline(mode, first, count, primcount, baseinstance);
+ }
+ void APIENTRY glDrawElementsInstancedBaseInstance(GLenum mode, GLsizei count, GLenum type, const GLvoid *indices, GLsizei primcount, GLuint baseinstance)
+@@ -3628,6 +3788,8 @@ void APIENTRY glDrawElementsInstancedBaseInstance(GLenum mode, GLsizei count, GL
+ #endif
+ 
+ 	static const auto trampoline = reshade::hooks::call(glDrawElementsInstancedBaseInstance);
++	std::optional<reshade::opengl::program_replacement_scope> replacement_scope;
++	if (g_opengl_context) replacement_scope.emplace(gl, g_opengl_context->_program_replacement);
+ 	trampoline(mode, count, type, indices, primcount, baseinstance);
+ }
+ void APIENTRY glDrawElementsInstancedBaseVertexBaseInstance(GLenum mode, GLsizei count, GLenum type, const GLvoid *indices, GLsizei primcount, GLint basevertex, GLuint baseinstance)
+@@ -3647,6 +3809,8 @@ void APIENTRY glDrawElementsInstancedBaseVertexBaseInstance(GLenum mode, GLsizei
+ #endif
+ 
+ 	static const auto trampoline = reshade::hooks::call(glDrawElementsInstancedBaseVertexBaseInstance);
++	std::optional<reshade::opengl::program_replacement_scope> replacement_scope;
++	if (g_opengl_context) replacement_scope.emplace(gl, g_opengl_context->_program_replacement);
+ 	trampoline(mode, count, type, indices, primcount, basevertex, baseinstance);
+ }
+ #endif
+@@ -3761,6 +3925,8 @@ void APIENTRY glDispatchCompute(GLuint num_groups_x, GLuint num_groups_y, GLuint
+ #endif
+ 
+ 	static const auto trampoline = reshade::hooks::call(glDispatchCompute);
++	std::optional<reshade::opengl::program_replacement_scope> replacement_scope;
++	if (g_opengl_context) replacement_scope.emplace(gl, g_opengl_context->_program_replacement);
+ 	trampoline(num_groups_x, num_groups_y, num_groups_z);
+ }
+ void APIENTRY glDispatchComputeIndirect(GLintptr indirect)
+@@ -3789,6 +3955,8 @@ void APIENTRY glDispatchComputeIndirect(GLintptr indirect)
+ #endif
+ 
+ 	static const auto trampoline = reshade::hooks::call(glDispatchComputeIndirect);
++	std::optional<reshade::opengl::program_replacement_scope> replacement_scope;
++	if (g_opengl_context) replacement_scope.emplace(gl, g_opengl_context->_program_replacement);
+ 	trampoline(indirect);
+ }
+ 
+@@ -3826,6 +3994,8 @@ void APIENTRY glMultiDrawArraysIndirect(GLenum mode, const void *indirect, GLsiz
+ #endif
+ 
+ 	static const auto trampoline = reshade::hooks::call(glMultiDrawArraysIndirect);
++	std::optional<reshade::opengl::program_replacement_scope> replacement_scope;
++	if (g_opengl_context) replacement_scope.emplace(gl, g_opengl_context->_program_replacement);
+ 	trampoline(mode, indirect, drawcount, stride);
+ }
+ void APIENTRY glMultiDrawElementsIndirect(GLenum mode, GLenum type, const void *indirect, GLsizei drawcount, GLsizei stride)
+@@ -3869,6 +4039,8 @@ void APIENTRY glMultiDrawElementsIndirect(GLenum mode, GLenum type, const void *
+ #endif
+ 
+ 	static const auto trampoline = reshade::hooks::call(glMultiDrawElementsIndirect);
++	std::optional<reshade::opengl::program_replacement_scope> replacement_scope;
++	if (g_opengl_context) replacement_scope.emplace(gl, g_opengl_context->_program_replacement);
+ 	trampoline(mode, type, indirect, drawcount, stride);
+ }
+ #endif
+diff --git a/source/opengl/opengl_hooks.hpp b/source/opengl/opengl_hooks.hpp
+index 369e979..ca868f2 100644
+--- a/source/opengl/opengl_hooks.hpp
++++ b/source/opengl/opengl_hooks.hpp
+@@ -242,3 +242,11 @@ extern "C" void APIENTRY glViewport(GLint x, GLint y, GLsizei width, GLsizei hei
+ extern "C" void APIENTRY glViewportArrayv(GLuint first, GLsizei count, const GLfloat *v);
+ extern "C" void APIENTRY glViewportIndexedf(GLuint index, GLfloat x, GLfloat y, GLfloat w, GLfloat h);
+ extern "C" void APIENTRY glViewportIndexedfv(GLuint index, const GLfloat *v);
++
++extern "C" GLuint APIENTRY glCreateShader(GLenum type);
++extern "C" void APIENTRY glDeleteShader(GLuint shader);
++extern "C" void APIENTRY glDetachShader(GLuint program, GLuint shader);
++extern "C" void APIENTRY glShaderBinary(GLsizei count, const GLuint *shaders, GLenum format, const void *binary, GLsizei length);
++extern "C" void APIENTRY glSpecializeShader(GLuint shader, const GLchar *entry, GLuint count, const GLuint *ids, const GLuint *values);
++
++extern "C" void APIENTRY glSpecializeShaderARB(GLuint shader, const GLchar *entry, GLuint count, const GLuint *ids, const GLuint *values);
+diff --git a/source/opengl/opengl_hooks_wgl.cpp b/source/opengl/opengl_hooks_wgl.cpp
+index 4473cba..a607ff5 100644
+--- a/source/opengl/opengl_hooks_wgl.cpp
++++ b/source/opengl/opengl_hooks_wgl.cpp
+@@ -1626,6 +1626,12 @@ extern "C" PROC  WINAPI wglGetProcAddress(LPCSTR lpszProc)
+ #ifdef GL_VERSION_2_0
+ 		RESHADE_OPENGL_HOOK_PROC(glDeleteProgram);
+ 		RESHADE_OPENGL_HOOK_PROC(glLinkProgram);
++		RESHADE_OPENGL_HOOK_PROC(glCreateShader);
++		RESHADE_OPENGL_HOOK_PROC(glDeleteShader);
++		RESHADE_OPENGL_HOOK_PROC(glDetachShader);
++		RESHADE_OPENGL_HOOK_PROC(glShaderBinary);
++		RESHADE_OPENGL_HOOK_PROC(glSpecializeShader);
++		RESHADE_OPENGL_HOOK_PROC(glSpecializeShaderARB);
+ 		RESHADE_OPENGL_HOOK_PROC(glShaderSource);
+ 		RESHADE_OPENGL_HOOK_PROC(glUseProgram);
+ 		RESHADE_OPENGL_HOOK_PROC(glBlendEquationSeparate);
+diff --git a/source/opengl/opengl_impl_command_list.cpp b/source/opengl/opengl_impl_command_list.cpp
+index b659a22..348d7a2 100644
+--- a/source/opengl/opengl_impl_command_list.cpp
++++ b/source/opengl/opengl_impl_command_list.cpp
+@@ -389,6 +389,7 @@ void reshade::opengl::device_context_impl::update_current_window_height(api::res
+ 
+ void reshade::opengl::device_context_impl::bind_pipeline(api::pipeline_stage stages, api::pipeline pipeline)
+ {
++	if ((stages & api::pipeline_stage::all_shader_stages) != 0) _program_replacement.reset();
+ 	if (pipeline == 0)
+ 	{
+ 		if ((stages & api::pipeline_stage::all_shader_stages) != 0)
+@@ -413,6 +414,15 @@ void reshade::opengl::device_context_impl::bind_pipeline(api::pipeline_stage sta
+ 		return;
+ 	}
+ 
++	// Replacement programs are used only inside a draw scope; glUniform calls by
++	// the game must continue to target the original program and its locations.
++	const auto replacement_object = reinterpret_cast<pipeline_impl *>(pipeline.handle);
++	if (replacement_object->replacement_state && (stages & api::pipeline_stage::all_shader_stages) != 0)
++	{
++		_program_replacement = replacement_object->replacement_state;
++		return;
++	}
++
+ 	// Always disable alpha test in case the application set that (fixes broken GUI rendering in Quake)
+ 	if (_device_impl->_compatibility_context)
+ 		gl.Disable(GL_ALPHA_TEST);
+@@ -1276,14 +1286,17 @@ void reshade::opengl::device_context_impl::bind_stream_output_buffers(uint32_t f
+ 
+ void reshade::opengl::device_context_impl::draw(uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex, uint32_t first_instance)
+ {
++	program_replacement_scope replacement_scope(gl, _program_replacement);
+ 	gl.DrawArraysInstancedBaseInstance(_current_prim_mode, first_vertex, vertex_count, instance_count, first_instance);
+ }
+ void reshade::opengl::device_context_impl::draw_indexed(uint32_t index_count, uint32_t instance_count, uint32_t first_index, int32_t vertex_offset, uint32_t first_instance)
+ {
++	program_replacement_scope replacement_scope(gl, _program_replacement);
+ 	gl.DrawElementsInstancedBaseVertexBaseInstance(_current_prim_mode, index_count, _current_index_type, reinterpret_cast<void *>(static_cast<uintptr_t>(first_index) * get_index_type_size(_current_index_type)), instance_count, vertex_offset, first_instance);
+ }
+ void reshade::opengl::device_context_impl::dispatch(uint32_t group_count_x, uint32_t group_count_y, uint32_t group_count_z)
+ {
++	program_replacement_scope replacement_scope(gl, _program_replacement);
+ 	gl.DispatchCompute(group_count_x, group_count_y, group_count_z);
+ }
+ void reshade::opengl::device_context_impl::dispatch_mesh(uint32_t, uint32_t, uint32_t)
+@@ -1296,6 +1309,7 @@ void reshade::opengl::device_context_impl::dispatch_rays(api::resource, uint64_t
+ }
+ void reshade::opengl::device_context_impl::draw_or_dispatch_indirect(api::indirect_command type, api::resource buffer, uint64_t offset, uint32_t draw_count, uint32_t stride)
+ {
++	program_replacement_scope replacement_scope(gl, _program_replacement);
+ 	switch (type)
+ 	{
+ 	case api::indirect_command::draw:
+diff --git a/source/opengl/opengl_impl_device.cpp b/source/opengl/opengl_impl_device.cpp
+index 81c0f87..192fff5 100644
+--- a/source/opengl/opengl_impl_device.cpp
++++ b/source/opengl/opengl_impl_device.cpp
+@@ -2023,17 +2023,26 @@ bool reshade::opengl::device_impl::create_shader(GLenum type, const reshade::api
+ 
+ 	out_shader = gl.CreateShader(type);
+ 
+-	if (desc.code_size > 4 && *static_cast<const uint32_t *>(desc.code) == 0x07230203) // Check for SPIR-V magic number
++	if (desc.code_size >= 4 && std::memcmp(desc.code, "\x03\x02\x23\x07", 4) == 0) // Check for SPIR-V magic number
+ 	{
+ 		assert(desc.code_size <= static_cast<size_t>(std::numeric_limits<GLsizei>::max()));
+ 
++		if (desc.code_size < 20 || (desc.code_size % 4) != 0 || !gl.ShaderBinary || (!gl.SpecializeShader && !gl.SpecializeShaderARB))
++		{
++			reshade::log::message(reshade::log::level::error, "OpenGL SPIR-V requires a valid module and glSpecializeShader support.");
++			return false;
++		}
+ 		gl.ShaderBinary(1, &out_shader, GL_SHADER_BINARY_FORMAT_SPIR_V, desc.code, static_cast<GLsizei>(desc.code_size));
+-		gl.SpecializeShader(out_shader, desc.entry_point != nullptr ? desc.entry_point : "main", desc.spec_constants, desc.spec_constant_ids, desc.spec_constant_values);
++		const auto specialize = gl.SpecializeShader ? gl.SpecializeShader : gl.SpecializeShaderARB;
++		specialize(out_shader, desc.entry_point != nullptr ? desc.entry_point : "main", desc.spec_constants, desc.spec_constant_ids, desc.spec_constant_values);
+ 	}
+ 	else
+ 	{
+-		assert(desc.entry_point == nullptr || std::strcmp(desc.entry_point, "main") == 0);
+-		assert(desc.spec_constants == 0);
++		if ((desc.entry_point != nullptr && std::strcmp(desc.entry_point, "main") != 0) || desc.spec_constants != 0)
++		{
++			reshade::log::message(reshade::log::level::error, "GLSL replacement cannot retain SPIR-V specialization metadata. Use a compatible SPIR-V file.");
++			return false;
++		}
+ 
+ 		const auto source = static_cast<const GLchar *>(desc.code);
+ 		const auto source_len = static_cast<GLint>(desc.code_size);
+@@ -2065,6 +2074,13 @@ bool reshade::opengl::device_impl::create_shader(GLenum type, const reshade::api
+ 
+ bool reshade::opengl::device_impl::create_pipeline(api::pipeline_layout, uint32_t subobject_count, const api::pipeline_subobject *subobjects, api::pipeline *out_pipeline)
+ {
++	return create_pipeline_with_source(0, subobject_count, subobjects, out_pipeline);
++}
++
++bool reshade::opengl::device_impl::create_pipeline_with_source(GLuint original_program, uint32_t subobject_count, const api::pipeline_subobject *subobjects, api::pipeline *out_pipeline)
++{
++	*out_pipeline = {};
++	pipeline_impl *impl = nullptr;
+ 	std::vector<GLuint> shaders;
+ 	api::pipeline_subobject input_layout_desc = {};
+ 	api::blend_desc blend_desc = {};
+@@ -2073,6 +2089,17 @@ bool reshade::opengl::device_impl::create_pipeline(api::pipeline_layout, uint32_
+ 	api::primitive_topology topology = api::primitive_topology::undefined;
+ 	uint32_t sample_mask = UINT32_MAX;
+ 
++	if (original_program != 0)
++	{
++		for (uint32_t i = 0; i < subobject_count; ++i)
++			for (uint32_t j = i + 1; j < subobject_count; ++j)
++				if (subobjects[i].type == subobjects[j].type)
++				{
++					reshade::log::message(reshade::log::level::error, "OpenGL replacement does not support multiple shader objects in one stage.");
++					return false;
++				}
++	}
++
+ 	for (uint32_t i = 0; i < subobject_count; ++i)
+ 	{
+ 		if (subobjects[i].count == 0)
+@@ -2166,7 +2193,7 @@ bool reshade::opengl::device_impl::create_pipeline(api::pipeline_layout, uint32_
+ 		}
+ 	}
+ 
+-	pipeline_impl *const impl = new pipeline_impl();
++	impl = new pipeline_impl();
+ 
+ 	if (!shaders.empty())
+ 	{
+@@ -2177,6 +2204,11 @@ bool reshade::opengl::device_impl::create_pipeline(api::pipeline_layout, uint32_
+ 			gl.AttachShader(impl->program, shader);
+ 		}
+ 
++		if (original_program != 0 && !copy_program_interfaces(gl, original_program, impl->program))
++		{
++			reshade::log::message(reshade::log::level::error, "OpenGL replacement: unsupported separable, transform-feedback or subroutine program.");
++			goto exit_failure;
++		}
+ 		gl.LinkProgram(impl->program);
+ 
+ 		for (const GLuint shader : shaders)
+@@ -2203,7 +2235,6 @@ bool reshade::opengl::device_impl::create_pipeline(api::pipeline_layout, uint32_
+ 				reshade::log::message(reshade::log::level::error, "Failed to link GLSL program:\n%s", log.data());
+ 			}
+ 
+-			gl.DeleteProgram(impl->program);
+ 			goto exit_failure;
+ 		}
+ 	}
+@@ -2212,6 +2243,18 @@ bool reshade::opengl::device_impl::create_pipeline(api::pipeline_layout, uint32_
+ 		impl->program = 0;
+ 	}
+ 
++	if (original_program != 0)
++	{
++		impl->replacement_state = std::make_shared<program_replacement_state>();
++		impl->replacement_state->original = original_program;
++		impl->replacement_state->replacement = impl->program;
++		if (!build_program_state(gl, impl->replacement_state.get()))
++		{
++			reshade::log::message(reshade::log::level::error, "OpenGL replacement: incompatible uniform types or ambiguous unnamed bindings.");
++			goto exit_failure;
++		}
++	}
++
+ 	impl->input_elements.assign(
+ 		static_cast<const api::input_element *>(input_layout_desc.data),
+ 		static_cast<const api::input_element *>(input_layout_desc.data) + input_layout_desc.count);
+@@ -2271,6 +2314,7 @@ bool reshade::opengl::device_impl::create_pipeline(api::pipeline_layout, uint32_
+ 	return true;
+ 
+ exit_failure:
++	if (impl != nullptr) { if (impl->program != 0) gl.DeleteProgram(impl->program); delete impl; }
+ 	for (const GLuint shader : shaders)
+ 		gl.DeleteShader(shader);
+ 
+@@ -2289,6 +2333,7 @@ void reshade::opengl::device_impl::destroy_pipeline(api::pipeline pipeline)
+ 
+ 	const auto impl = reinterpret_cast<pipeline_impl *>(pipeline.handle);
+ 
++	if (impl->replacement_state) impl->replacement_state->alive = false;
+ 	gl.DeleteProgram(impl->program);
+ 
+ 	if (!impl->input_elements.empty())
+@@ -2744,3 +2789,20 @@ bool reshade::opengl::device_impl::get_pipeline_shader_group_handles(api::pipeli
+ {
+ 	return false;
+ }
++
++// Optional RenoDX extension; no existing ReShade API structure or version changes.
++#if RESHADE_ADDON
++#if defined(_M_IX86)
++#pragma comment(linker, "/EXPORT:ReShadeCreateOpenGLPipelineReplacement=_ReShadeCreateOpenGLPipelineReplacement")
++#endif
++extern "C" __declspec(dllexport) bool ReShadeCreateOpenGLPipelineReplacement(
++    reshade::api::device *device, reshade::api::pipeline original,
++    uint32_t count, const reshade::api::pipeline_subobject *subobjects, reshade::api::pipeline *output)
++{
++	if (device == nullptr || output == nullptr || device->get_api() != reshade::api::device_api::opengl
++		|| (original.handle >> 40) != GL_PROGRAM) return false;
++	auto *impl = static_cast<reshade::opengl::device_impl *>(device);
++	if (!impl->_dispatch_table.IsProgram(static_cast<GLuint>(original.handle))) return false;
++	return impl->create_pipeline_with_source(static_cast<GLuint>(original.handle), count, subobjects, output);
++}
++#endif
+diff --git a/source/opengl/opengl_impl_device.hpp b/source/opengl/opengl_impl_device.hpp
+index 4887606..6475287 100644
+--- a/source/opengl/opengl_impl_device.hpp
++++ b/source/opengl/opengl_impl_device.hpp
+@@ -9,6 +9,9 @@
+ #include "reshade_api_object_impl.hpp"
+ #include <atomic>
+ #include <unordered_map>
++#include <unordered_set>
++#include <mutex>
++#include <string>
+ 
+ namespace reshade::opengl
+ {
+@@ -64,6 +67,7 @@ namespace reshade::opengl
+ 		bool create_shader(GLenum type, const reshade::api::shader_desc &desc, GLuint &out_shader);
+ 		bool create_pipeline(api::pipeline_layout layout, uint32_t subobjecte_count, const api::pipeline_subobject *subobjects, api::pipeline *out_pipeline) final;
+ 		void destroy_pipeline(api::pipeline pipeline) final;
++		bool create_pipeline_with_source(GLuint original_program, uint32_t subobject_count, const api::pipeline_subobject *subobjects, api::pipeline *out_pipeline);
+ 
+ 		bool create_pipeline_layout(uint32_t param_count, const api::pipeline_layout_param *params, api::pipeline_layout *out_layout) final;
+ 		void destroy_pipeline_layout(api::pipeline_layout layout) final;
+@@ -96,6 +100,17 @@ namespace reshade::opengl
+ 
+ 		bool get_pipeline_shader_group_handles(api::pipeline pipeline, uint32_t first, uint32_t count, void *out_handles) final;
+ 
++		struct shader_binary_data
++		{
++			std::vector<char> code;
++			std::string entry_point = "main";
++			std::vector<uint32_t> ids, values;
++		};
++		// Shared by contexts in this device's share group. Never hold across addon callbacks.
++		std::mutex shader_capture_mutex;
++		std::unordered_map<GLuint, shader_binary_data> shader_binaries;
++		std::unordered_set<GLuint> notified_programs;
++
+ 		const GladGLContext _dispatch_table;
+ 
+ 	protected:
+diff --git a/source/opengl/opengl_impl_device_context.hpp b/source/opengl/opengl_impl_device_context.hpp
+index ffad4b3..4bf7f86 100644
+--- a/source/opengl/opengl_impl_device_context.hpp
++++ b/source/opengl/opengl_impl_device_context.hpp
+@@ -8,6 +8,7 @@
+ #include <glad/wgl.h>
+ #include "reshade_api_object_impl.hpp"
+ #include <unordered_map>
++#include "opengl_program_state.hpp"
+ 
+ namespace reshade::opengl
+ {
+@@ -21,6 +22,8 @@ namespace reshade::opengl
+ 
+ 		api::device *get_device() final;
+ 
++		std::shared_ptr<program_replacement_state> _program_replacement;
++
+ 		api::command_queue_type get_type() const final { return api::command_queue_type::graphics | api::command_queue_type::compute | api::command_queue_type::copy; }
+ 
+ 		void wait_idle() const final;
+diff --git a/source/opengl/opengl_impl_type_convert.hpp b/source/opengl/opengl_impl_type_convert.hpp
+index 0df7c96..a17a0e9 100644
+--- a/source/opengl/opengl_impl_type_convert.hpp
++++ b/source/opengl/opengl_impl_type_convert.hpp
+@@ -8,13 +8,15 @@
+ #include <glad/wgl.h>
+ #include "reshade_api_pipeline.hpp"
+ #include <vector>
++#include "opengl_program_state.hpp"
+ #include <limits>
+ 
+ namespace reshade::opengl
+ {
+ 	struct pipeline_impl
+ 	{
+-		GLuint program;
++		GLuint program = 0;
++		std::shared_ptr<program_replacement_state> replacement_state;
+ 
+ 		std::vector<api::input_element> input_elements;
+ 		api::primitive_topology topology;
+diff --git a/source/opengl/opengl_program_state.hpp b/source/opengl/opengl_program_state.hpp
+new file mode 100644
+index 0000000..c0ab453
+--- /dev/null
++++ b/source/opengl/opengl_program_state.hpp
+@@ -0,0 +1,381 @@
++/*
++ * OpenGL replacement program state support.
++ * SPDX-License-Identifier: BSD-3-Clause OR MIT
++ */
++#pragma once
++#include <glad/gl.h>
++#include <algorithm>
++#include <atomic>
++#include <memory>
++#include <string>
++#include <vector>
++
++namespace reshade::opengl
++{
++	struct replacement_uniform
++	{
++		GLint source, destination;
++		GLenum type;
++	};
++	struct replacement_block
++	{
++		GLuint source, destination;
++		GLenum interface_type;
++	};
++	struct program_replacement_state
++	{
++		GLuint original = 0, replacement = 0;
++		std::atomic_bool alive = true;
++		std::vector<replacement_uniform> uniforms;
++		std::vector<replacement_block> blocks;
++	};
++
++	inline std::string program_resource_name(const GladGLContext &gl, GLuint program, GLenum type, GLuint index)
++	{
++		const GLenum prop = GL_NAME_LENGTH;
++		GLint length = 0;
++		gl.GetProgramResourceiv(program, type, index, 1, &prop, 1, nullptr, &length);
++		if (length <= 1) return {};
++		std::string name(static_cast<size_t>(length), '\0');
++		GLsizei written = 0;
++		gl.GetProgramResourceName(program, type, index, length, &written, name.data());
++		name.resize(written);
++		return name;
++	}
++
++	// Preserve application-selected attribute/output locations before linking.
++	// Unsupported program mechanisms fail closed, leaving the original usable.
++	inline bool copy_program_interfaces(const GladGLContext &gl, GLuint original, GLuint replacement)
++	{
++		if (!gl.VERSION_4_3 || !gl.GetProgramResourceiv || !gl.GetProgramInterfaceiv || !gl.ProgramUniform1fv) return false;
++		GLint count = 0;
++		gl.GetProgramiv(original, GL_PROGRAM_SEPARABLE, &count);
++		if (count != 0) return false;
++		gl.GetProgramiv(original, GL_TRANSFORM_FEEDBACK_VARYINGS, &count);
++		if (count != 0) return false;
++		for (GLenum stage : {GL_VERTEX_SHADER, GL_TESS_CONTROL_SHADER, GL_TESS_EVALUATION_SHADER, GL_GEOMETRY_SHADER, GL_FRAGMENT_SHADER, GL_COMPUTE_SHADER})
++		{
++			gl.GetProgramStageiv(original, stage, GL_ACTIVE_SUBROUTINE_UNIFORMS, &count);
++			if (count != 0) return false;
++		}
++		for (GLenum type : {GL_PROGRAM_INPUT, GL_PROGRAM_OUTPUT})
++		{
++			gl.GetProgramInterfaceiv(original, type, GL_ACTIVE_RESOURCES, &count);
++			for (GLuint i = 0; i < static_cast<GLuint>(count); ++i)
++			{
++				const auto name = program_resource_name(gl, original, type, i);
++				// SPIR-V may have no names; its explicit locations remain in the module.
++				if (name.empty() || name.compare(0, 3, "gl_") == 0) continue;
++				const GLenum props[] = {GL_LOCATION, GL_LOCATION_INDEX};
++				GLint values[2] = {-1, 0};
++				gl.GetProgramResourceiv(original, type, i, type == GL_PROGRAM_OUTPUT ? 2 : 1, props, 2, nullptr, values);
++				if (values[0] < 0) continue;
++				if (type == GL_PROGRAM_INPUT) gl.BindAttribLocation(replacement, values[0], name.c_str());
++				else gl.BindFragDataLocationIndexed(replacement, values[0], values[1], name.c_str());
++			}
++		}
++		return true;
++	}
++
++	inline bool copy_uniform(const GladGLContext &gl, GLuint original, GLuint replacement, const replacement_uniform &u, bool validate_only = false)
++	{
++		GLfloat f[16] = {};
++		GLdouble d[16] = {};
++		GLint i[4] = {};
++		GLuint v[4] = {};
++		switch (u.type)
++		{
++		case GL_FLOAT:
++			if (!validate_only) { gl.GetUniformfv(original, u.source, f); gl.ProgramUniform1fv(replacement, u.destination, 1, f); }
++			return true;
++		case GL_FLOAT_VEC2:
++			if (!validate_only) { gl.GetUniformfv(original, u.source, f); gl.ProgramUniform2fv(replacement, u.destination, 1, f); }
++			return true;
++		case GL_FLOAT_VEC3:
++			if (!validate_only) { gl.GetUniformfv(original, u.source, f); gl.ProgramUniform3fv(replacement, u.destination, 1, f); }
++			return true;
++		case GL_FLOAT_VEC4:
++			if (!validate_only) { gl.GetUniformfv(original, u.source, f); gl.ProgramUniform4fv(replacement, u.destination, 1, f); }
++			return true;
++		case GL_DOUBLE:
++			if (!validate_only) { gl.GetUniformdv(original, u.source, d); gl.ProgramUniform1dv(replacement, u.destination, 1, d); }
++			return true;
++		case GL_DOUBLE_VEC2:
++			if (!validate_only) { gl.GetUniformdv(original, u.source, d); gl.ProgramUniform2dv(replacement, u.destination, 1, d); }
++			return true;
++		case GL_DOUBLE_VEC3:
++			if (!validate_only) { gl.GetUniformdv(original, u.source, d); gl.ProgramUniform3dv(replacement, u.destination, 1, d); }
++			return true;
++		case GL_DOUBLE_VEC4:
++			if (!validate_only) { gl.GetUniformdv(original, u.source, d); gl.ProgramUniform4dv(replacement, u.destination, 1, d); }
++			return true;
++		case GL_INT:
++		case GL_BOOL:
++			if (!validate_only) { gl.GetUniformiv(original, u.source, i); gl.ProgramUniform1iv(replacement, u.destination, 1, i); }
++			return true;
++		case GL_INT_VEC2:
++		case GL_BOOL_VEC2:
++			if (!validate_only) { gl.GetUniformiv(original, u.source, i); gl.ProgramUniform2iv(replacement, u.destination, 1, i); }
++			return true;
++		case GL_INT_VEC3:
++		case GL_BOOL_VEC3:
++			if (!validate_only) { gl.GetUniformiv(original, u.source, i); gl.ProgramUniform3iv(replacement, u.destination, 1, i); }
++			return true;
++		case GL_INT_VEC4:
++		case GL_BOOL_VEC4:
++			if (!validate_only) { gl.GetUniformiv(original, u.source, i); gl.ProgramUniform4iv(replacement, u.destination, 1, i); }
++			return true;
++		case GL_UNSIGNED_INT:
++			if (!validate_only) { gl.GetUniformuiv(original, u.source, v); gl.ProgramUniform1uiv(replacement, u.destination, 1, v); }
++			return true;
++		case GL_UNSIGNED_INT_VEC2:
++			if (!validate_only) { gl.GetUniformuiv(original, u.source, v); gl.ProgramUniform2uiv(replacement, u.destination, 1, v); }
++			return true;
++		case GL_UNSIGNED_INT_VEC3:
++			if (!validate_only) { gl.GetUniformuiv(original, u.source, v); gl.ProgramUniform3uiv(replacement, u.destination, 1, v); }
++			return true;
++		case GL_UNSIGNED_INT_VEC4:
++			if (!validate_only) { gl.GetUniformuiv(original, u.source, v); gl.ProgramUniform4uiv(replacement, u.destination, 1, v); }
++			return true;
++		case GL_FLOAT_MAT2:
++			if (!validate_only) { gl.GetUniformfv(original, u.source, f); gl.ProgramUniformMatrix2fv(replacement, u.destination, 1, GL_FALSE, f); }
++			return true;
++		case GL_FLOAT_MAT3:
++			if (!validate_only) { gl.GetUniformfv(original, u.source, f); gl.ProgramUniformMatrix3fv(replacement, u.destination, 1, GL_FALSE, f); }
++			return true;
++		case GL_FLOAT_MAT4:
++			if (!validate_only) { gl.GetUniformfv(original, u.source, f); gl.ProgramUniformMatrix4fv(replacement, u.destination, 1, GL_FALSE, f); }
++			return true;
++		case GL_FLOAT_MAT2x3:
++			if (!validate_only) { gl.GetUniformfv(original, u.source, f); gl.ProgramUniformMatrix2x3fv(replacement, u.destination, 1, GL_FALSE, f); }
++			return true;
++		case GL_FLOAT_MAT2x4:
++			if (!validate_only) { gl.GetUniformfv(original, u.source, f); gl.ProgramUniformMatrix2x4fv(replacement, u.destination, 1, GL_FALSE, f); }
++			return true;
++		case GL_FLOAT_MAT3x2:
++			if (!validate_only) { gl.GetUniformfv(original, u.source, f); gl.ProgramUniformMatrix3x2fv(replacement, u.destination, 1, GL_FALSE, f); }
++			return true;
++		case GL_FLOAT_MAT3x4:
++			if (!validate_only) { gl.GetUniformfv(original, u.source, f); gl.ProgramUniformMatrix3x4fv(replacement, u.destination, 1, GL_FALSE, f); }
++			return true;
++		case GL_FLOAT_MAT4x2:
++			if (!validate_only) { gl.GetUniformfv(original, u.source, f); gl.ProgramUniformMatrix4x2fv(replacement, u.destination, 1, GL_FALSE, f); }
++			return true;
++		case GL_FLOAT_MAT4x3:
++			if (!validate_only) { gl.GetUniformfv(original, u.source, f); gl.ProgramUniformMatrix4x3fv(replacement, u.destination, 1, GL_FALSE, f); }
++			return true;
++		case GL_DOUBLE_MAT2:
++			if (!validate_only) { gl.GetUniformdv(original, u.source, d); gl.ProgramUniformMatrix2dv(replacement, u.destination, 1, GL_FALSE, d); }
++			return true;
++		case GL_DOUBLE_MAT3:
++			if (!validate_only) { gl.GetUniformdv(original, u.source, d); gl.ProgramUniformMatrix3dv(replacement, u.destination, 1, GL_FALSE, d); }
++			return true;
++		case GL_DOUBLE_MAT4:
++			if (!validate_only) { gl.GetUniformdv(original, u.source, d); gl.ProgramUniformMatrix4dv(replacement, u.destination, 1, GL_FALSE, d); }
++			return true;
++		case GL_DOUBLE_MAT2x3:
++			if (!validate_only) { gl.GetUniformdv(original, u.source, d); gl.ProgramUniformMatrix2x3dv(replacement, u.destination, 1, GL_FALSE, d); }
++			return true;
++		case GL_DOUBLE_MAT2x4:
++			if (!validate_only) { gl.GetUniformdv(original, u.source, d); gl.ProgramUniformMatrix2x4dv(replacement, u.destination, 1, GL_FALSE, d); }
++			return true;
++		case GL_DOUBLE_MAT3x2:
++			if (!validate_only) { gl.GetUniformdv(original, u.source, d); gl.ProgramUniformMatrix3x2dv(replacement, u.destination, 1, GL_FALSE, d); }
++			return true;
++		case GL_DOUBLE_MAT3x4:
++			if (!validate_only) { gl.GetUniformdv(original, u.source, d); gl.ProgramUniformMatrix3x4dv(replacement, u.destination, 1, GL_FALSE, d); }
++			return true;
++		case GL_DOUBLE_MAT4x2:
++			if (!validate_only) { gl.GetUniformdv(original, u.source, d); gl.ProgramUniformMatrix4x2dv(replacement, u.destination, 1, GL_FALSE, d); }
++			return true;
++		case GL_DOUBLE_MAT4x3:
++			if (!validate_only) { gl.GetUniformdv(original, u.source, d); gl.ProgramUniformMatrix4x3dv(replacement, u.destination, 1, GL_FALSE, d); }
++			return true;
++		case GL_SAMPLER_1D:
++		case GL_SAMPLER_2D:
++		case GL_SAMPLER_3D:
++		case GL_SAMPLER_CUBE:
++		case GL_SAMPLER_1D_SHADOW:
++		case GL_SAMPLER_2D_SHADOW:
++		case GL_SAMPLER_1D_ARRAY:
++		case GL_SAMPLER_2D_ARRAY:
++		case GL_SAMPLER_1D_ARRAY_SHADOW:
++		case GL_SAMPLER_2D_ARRAY_SHADOW:
++		case GL_SAMPLER_2D_MULTISAMPLE:
++		case GL_SAMPLER_2D_MULTISAMPLE_ARRAY:
++		case GL_SAMPLER_CUBE_SHADOW:
++		case GL_SAMPLER_BUFFER:
++		case GL_SAMPLER_2D_RECT:
++		case GL_SAMPLER_2D_RECT_SHADOW:
++		case GL_SAMPLER_CUBE_MAP_ARRAY:
++		case GL_SAMPLER_CUBE_MAP_ARRAY_SHADOW:
++		case GL_INT_SAMPLER_1D:
++		case GL_INT_SAMPLER_2D:
++		case GL_INT_SAMPLER_3D:
++		case GL_INT_SAMPLER_CUBE:
++		case GL_INT_SAMPLER_1D_ARRAY:
++		case GL_INT_SAMPLER_2D_ARRAY:
++		case GL_INT_SAMPLER_2D_MULTISAMPLE:
++		case GL_INT_SAMPLER_2D_MULTISAMPLE_ARRAY:
++		case GL_INT_SAMPLER_BUFFER:
++		case GL_INT_SAMPLER_2D_RECT:
++		case GL_INT_SAMPLER_CUBE_MAP_ARRAY:
++		case GL_UNSIGNED_INT_SAMPLER_1D:
++		case GL_UNSIGNED_INT_SAMPLER_2D:
++		case GL_UNSIGNED_INT_SAMPLER_3D:
++		case GL_UNSIGNED_INT_SAMPLER_CUBE:
++		case GL_UNSIGNED_INT_SAMPLER_1D_ARRAY:
++		case GL_UNSIGNED_INT_SAMPLER_2D_ARRAY:
++		case GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE:
++		case GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE_ARRAY:
++		case GL_UNSIGNED_INT_SAMPLER_BUFFER:
++		case GL_UNSIGNED_INT_SAMPLER_2D_RECT:
++		case GL_UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY:
++		case GL_IMAGE_1D:
++		case GL_IMAGE_2D:
++		case GL_IMAGE_3D:
++		case GL_IMAGE_2D_RECT:
++		case GL_IMAGE_CUBE:
++		case GL_IMAGE_BUFFER:
++		case GL_IMAGE_1D_ARRAY:
++		case GL_IMAGE_2D_ARRAY:
++		case GL_IMAGE_CUBE_MAP_ARRAY:
++		case GL_IMAGE_2D_MULTISAMPLE:
++		case GL_IMAGE_2D_MULTISAMPLE_ARRAY:
++		case GL_INT_IMAGE_1D:
++		case GL_INT_IMAGE_2D:
++		case GL_INT_IMAGE_3D:
++		case GL_INT_IMAGE_2D_RECT:
++		case GL_INT_IMAGE_CUBE:
++		case GL_INT_IMAGE_BUFFER:
++		case GL_INT_IMAGE_1D_ARRAY:
++		case GL_INT_IMAGE_2D_ARRAY:
++		case GL_INT_IMAGE_CUBE_MAP_ARRAY:
++		case GL_INT_IMAGE_2D_MULTISAMPLE:
++		case GL_INT_IMAGE_2D_MULTISAMPLE_ARRAY:
++		case GL_UNSIGNED_INT_IMAGE_1D:
++		case GL_UNSIGNED_INT_IMAGE_2D:
++		case GL_UNSIGNED_INT_IMAGE_3D:
++		case GL_UNSIGNED_INT_IMAGE_2D_RECT:
++		case GL_UNSIGNED_INT_IMAGE_CUBE:
++		case GL_UNSIGNED_INT_IMAGE_BUFFER:
++		case GL_UNSIGNED_INT_IMAGE_1D_ARRAY:
++		case GL_UNSIGNED_INT_IMAGE_2D_ARRAY:
++		case GL_UNSIGNED_INT_IMAGE_CUBE_MAP_ARRAY:
++		case GL_UNSIGNED_INT_IMAGE_2D_MULTISAMPLE:
++		case GL_UNSIGNED_INT_IMAGE_2D_MULTISAMPLE_ARRAY:
++			if (!validate_only) { gl.GetUniformiv(original, u.source, i); gl.ProgramUniform1iv(replacement, u.destination, 1, i); }
++			return true;
++		default:
++			return false;
++		}
++	}
++
++	inline bool build_program_state(const GladGLContext &gl, program_replacement_state *state)
++	{
++		GLint count = 0;
++		gl.GetProgramInterfaceiv(state->replacement, GL_UNIFORM, GL_ACTIVE_RESOURCES, &count);
++		for (GLuint index = 0; index < static_cast<GLuint>(count); ++index)
++		{
++			const GLenum props[] = {GL_LOCATION, GL_TYPE, GL_ARRAY_SIZE, GL_BLOCK_INDEX};
++			GLint info[4] = {};
++			gl.GetProgramResourceiv(state->replacement, GL_UNIFORM, index, 4, props, 4, nullptr, info);
++			if (info[0] < 0 || info[3] != -1) continue;
++			const auto name = program_resource_name(gl, state->replacement, GL_UNIFORM, index);
++			if (name.compare(0, 3, "gl_") == 0) continue;
++			GLuint original_index = name.empty() ? GL_INVALID_INDEX : gl.GetProgramResourceIndex(state->original, GL_UNIFORM, name.c_str());
++			// Unnamed SPIR-V resources carry explicit locations. Match location AND type.
++			if (name.empty())
++			{
++				GLint original_count = 0;
++				gl.GetProgramInterfaceiv(state->original, GL_UNIFORM, GL_ACTIVE_RESOURCES, &original_count);
++				for (GLuint j = 0; j < static_cast<GLuint>(original_count); ++j)
++				{
++					GLint candidate[4] = {};
++					gl.GetProgramResourceiv(state->original, GL_UNIFORM, j, 4, props, 4, nullptr, candidate);
++					if (candidate[0] == info[0] && candidate[3] == -1) { original_index = j; break; }
++				}
++			}
++			if (original_index == GL_INVALID_INDEX) continue; // New replacement-only uniform.
++			GLint original_info[4] = {};
++			gl.GetProgramResourceiv(state->original, GL_UNIFORM, original_index, 4, props, 4, nullptr, original_info);
++			if (original_info[1] != info[1] || original_info[3] != -1) return false;
++			for (GLint element = 0; element < std::min(info[2], original_info[2]); ++element)
++			{
++				std::string element_name = name;
++				if (info[2] > 1 && !name.empty())
++				{
++					const auto at = element_name.find("[0]");
++					if (at == std::string::npos) return false;
++					element_name.replace(at, 3, "[" + std::to_string(element) + "]");
++				}
++				replacement_uniform uniform = {
++					name.empty() ? original_info[0] + element : gl.GetUniformLocation(state->original, element_name.c_str()),
++					name.empty() ? info[0] + element : gl.GetUniformLocation(state->replacement, element_name.c_str()),
++					static_cast<GLenum>(info[1])};
++				if (uniform.source < 0 || uniform.destination < 0) continue;
++				if (!copy_uniform(gl, state->original, state->replacement, uniform, true)) return false;
++				state->uniforms.push_back(uniform);
++			}
++		}
++		for (GLenum type : {GL_UNIFORM_BLOCK, GL_SHADER_STORAGE_BLOCK})
++		{
++			gl.GetProgramInterfaceiv(state->replacement, type, GL_ACTIVE_RESOURCES, &count);
++			for (GLuint index = 0; index < static_cast<GLuint>(count); ++index)
++			{
++				const auto name = program_resource_name(gl, state->replacement, type, index);
++				GLuint source = name.empty() ? GL_INVALID_INDEX : gl.GetProgramResourceIndex(state->original, type, name.c_str());
++				if (name.empty())
++				{
++					const GLenum prop = GL_BUFFER_BINDING;
++					GLint binding = 0, original_count = 0;
++					gl.GetProgramResourceiv(state->replacement, type, index, 1, &prop, 1, nullptr, &binding);
++					gl.GetProgramInterfaceiv(state->original, type, GL_ACTIVE_RESOURCES, &original_count);
++					for (GLuint j = 0; j < static_cast<GLuint>(original_count); ++j)
++					{
++						GLint other = 0;
++						gl.GetProgramResourceiv(state->original, type, j, 1, &prop, 1, nullptr, &other);
++						if (other != binding) continue;
++						if (source != GL_INVALID_INDEX) return false; // Ambiguous unnamed blocks.
++						source = j;
++					}
++				}
++				if (source != GL_INVALID_INDEX) state->blocks.push_back({source, index, type});
++			}
++		}
++		return true;
++	}
++
++	inline void copy_program_state(const GladGLContext &gl, const program_replacement_state &state)
++	{
++		for (const auto &uniform : state.uniforms) copy_uniform(gl, state.original, state.replacement, uniform);
++		for (const auto &block : state.blocks)
++		{
++			const GLenum prop = GL_BUFFER_BINDING;
++			GLint binding = 0;
++			gl.GetProgramResourceiv(state.original, block.interface_type, block.source, 1, &prop, 1, nullptr, &binding);
++			if (block.interface_type == GL_UNIFORM_BLOCK) gl.UniformBlockBinding(state.replacement, block.destination, binding);
++			else gl.ShaderStorageBlockBinding(state.replacement, block.destination, binding);
++		}
++	}
++
++	// Lives only around the native draw/dispatch, never across game uniform updates.
++	class program_replacement_scope
++	{
++		const GladGLContext *_gl = nullptr;
++		GLint _previous = 0;
++	public:
++		program_replacement_scope(const GladGLContext &gl, const std::shared_ptr<program_replacement_state> &state)
++		{
++			if (!state || !state->alive.load()) return;
++			gl.GetIntegerv(GL_CURRENT_PROGRAM, &_previous);
++			if (static_cast<GLuint>(_previous) != state->original) return;
++			copy_program_state(gl, *state);
++			gl.UseProgram(state->replacement);
++			_gl = &gl;
++		}
++		program_replacement_scope(const program_replacement_scope &) = delete;
++		program_replacement_scope &operator=(const program_replacement_scope &) = delete;
++		~program_replacement_scope() { if (_gl) _gl->UseProgram(_previous); }
++	};
++}
