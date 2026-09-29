@@ -1406,7 +1406,7 @@ bool reshade::runtime::load_effect(const std::filesystem::path &source_file, con
 	attributes += "height=" + std::to_string(_effect_permutations[permutation_index].height) + ';';
 	attributes += "color_space=" + std::to_string(static_cast<uint32_t>(_effect_permutations[permutation_index].color_space)) + ';';
 	attributes += "color_format=" + std::to_string(static_cast<uint32_t>(_effect_permutations[permutation_index].color_format)) + ';';
-	attributes += "version=" + std::to_string(VERSION_MAJOR * 10000 + VERSION_MINOR * 100 + VERSION_REVISION) + ';';
+	attributes += "version=" + std::to_string(60800) + ';';
 	attributes += "performance_mode=" + std::string(_performance_mode ? "1" : "0") + ';';
 	attributes += "vendor=" + std::to_string(_vendor_id) + ';';
 	attributes += "device=" + std::to_string(_device_id) + ';';
@@ -1542,7 +1542,7 @@ bool reshade::runtime::load_effect(const std::filesystem::path &source_file, con
 	if (!preprocessed && (preprocess_required || (source_cached = load_effect_cache(source_file.stem().u8string() + '-' + std::to_string(_renderer_id) + '-' + std::to_string(source_hash), "i", source)) == false))
 	{
 		reshadefx::preprocessor pp;
-		pp.add_macro_definition("__RESHADE__", std::to_string(VERSION_MAJOR * 10000 + VERSION_MINOR * 100 + VERSION_REVISION));
+		pp.add_macro_definition("__RESHADE__", std::to_string(60800));
 		pp.add_macro_definition("__RESHADE_PERMUTATION__", permutation_index != 0 ? "1" : "0");
 		pp.add_macro_definition("__RESHADE_PERFORMANCE_MODE__", _performance_mode ? "1" : "0");
 		pp.add_macro_definition("__VENDOR__", std::to_string(_vendor_id));

@@ -791,7 +791,7 @@ extern "C" void APIENTRY glCopyPixels(GLint x, GLint y, GLsizei width, GLsizei h
 extern "C" void APIENTRY glClear(GLbitfield mask)
 {
 #if RESHADE_ADDON
-	if (g_opengl_context && count > 0 && string && (
+	if (g_opengl_context && (
 		reshade::has_addon_event<reshade::addon_event::clear_depth_stencil_view>() ||
 		reshade::has_addon_event<reshade::addon_event::clear_render_target_view>()))
 	{
